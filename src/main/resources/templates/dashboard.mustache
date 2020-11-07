@@ -1,0 +1,121 @@
+{{> header}}
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-1 d-md-none d-lg-block"></div>
+    <div class="col-9">
+      <h2 class="mt-5">{{title}}</h2>
+      <div class="row">
+        <div class="col-8">
+          <table class="table table-striped table-bordered table-hover table-md mt-2">
+            <thead class="thead-light">
+            <tr>
+              <th>Номер</th>
+              <th>Покупка</th>
+              <th>Стоимость</th>
+              <th>Категория</th>
+              <th>Время</th>
+            </tr>
+            </thead>
+            <tbody id="table-body">
+            {{#stonks}}
+              <tr>
+                <td>{{id}}</td>
+                <td><b>{{name}}</b></td>
+                <td>{{cost}}</td>
+                <td>{{category}}</td>
+                <td>{{addedAt}}</td>
+              </tr>
+            {{/stonks}}
+            </tbody>
+          </table>
+        </div>
+        <div class="col-4">
+          <form id="add-stonk">
+            <div class="form-group">
+              <label for="name">Название</label>
+              <input id="name" name="name" type="text" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="cost">Цена</label>
+              <div class="input-group">
+                <input id="cost" name="cost" type="number" class="form-control" min="0.00" max="200000.00" step="0.01">
+                <div class="input-group-append">
+                  <span class="input-group-text" id="input-group-append">₽</span>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="category">Категория</label>
+              <input id="category" name="category" type="text" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-primary">Добавить</button>
+          </form>
+
+          <div class="alert alert-success fade show mt-3" style="display: none" id="success-alert">
+            Добавлено!
+          </div>
+
+          <div class="alert alert-danger fade show mt-3" style="display: none" id="danger-alert">
+            Ошибка!
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-2 d-md-none d-lg-block"></div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const successAlert = document.getElementById("success-alert");
+    const dangerAlert = document.getElementById("danger-alert");
+    const form = jQuery("#add-stonk");
+    const table = document.getElementById("table-body")
+
+    const hide = (el) => el.style.display = "none";
+    const show = (el) => el.style.display = "";
+
+    const showError = (error) => {
+      console.error(error);
+      show(dangerAlert);
+    }
+
+    jQuery("#danger-alert-dismiss").on("click", () => {
+      hide(dangerAlert)
+    });
+    jQuery("#success-alert-dismiss").on("click", () => {
+      hide(successAlert);
+    });
+
+    document.getElementById("add-stonk").addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const newStonk = form.serializeArray().reduce((acc, next) => ({...acc, [next.name]: next.value}), {});
+      newStonk.cost = newStonk.cost * 100;
+
+      axios.post("/api/stonk/add", newStonk)
+        .then((response) => {
+          axios.get(`/api/stonk/${response.data.id}`)
+            .then((response) => {
+              const {id, name, cost, category, addedAt} = response.data;
+              const row = document.createElement("tr");
+              row.innerHTML = `
+                <td>${id}</td>
+                <td><b>${name}</b></td>
+                <td>${cost}</td>
+                <td>${category}</td>
+                <td>${addedAt}</td>
+              `
+              table.prepend(row);
+              show(successAlert);
+              setTimeout(() => hide(successAlert), 5000)
+            })
+            .catch((error) => showError(error));
+        })
+        .catch((error) => showError(error));
+    });
+  });
+</script>
+
+{{> footer}}
