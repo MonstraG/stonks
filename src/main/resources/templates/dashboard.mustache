@@ -5,32 +5,24 @@
     <div class="col-1 d-md-none d-lg-block"></div>
     <div class="col-9">
       <h2 class="mt-5">{{title}}</h2>
+
       <div class="row">
-        <div class="col-8">
+        <div class="col-9">
           <table class="table table-striped table-bordered table-hover table-md mt-2">
             <thead class="thead-light">
             <tr>
-              <th>Номер</th>
               <th>Покупка</th>
               <th>Стоимость</th>
               <th>Категория</th>
               <th>Время</th>
+              <th>Удалить</th>
             </tr>
             </thead>
             <tbody id="table-body">
-            {{#stonks}}
-              <tr>
-                <td>{{id}}</td>
-                <td><b>{{name}}</b></td>
-                <td>{{cost}}</td>
-                <td>{{category}}</td>
-                <td>{{addedAt}}</td>
-              </tr>
-            {{/stonks}}
             </tbody>
           </table>
         </div>
-        <div class="col-4">
+        <div class="col-3">
           <form id="add-stonk">
             <div class="form-group">
               <label for="name">Название</label>
@@ -39,7 +31,7 @@
             <div class="form-group">
               <label for="cost">Цена</label>
               <div class="input-group">
-                <input id="cost" name="cost" type="number" class="form-control" min="0.00" max="200000.00" step="0.01">
+                <input id="cost" name="cost" type="number" class="form-control" min="0.00" max="200000.00" step="0.01" required>
                 <div class="input-group-append">
                   <span class="input-group-text" id="input-group-append">₽</span>
                 </div>
@@ -61,6 +53,13 @@
           </div>
         </div>
       </div>
+
+      <div class="row">
+        <div class="col-9">
+          <canvas id="category-distribution"></canvas>
+        </div>
+      </div>
+
     </div>
     <div class="col-2 d-md-none d-lg-block"></div>
   </div>
@@ -68,52 +67,223 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    const state = {
+      rows: [],
+      chart: null,
+
+      deletion: {
+        timeout: null,
+        interval: null,
+        ticks: 0,
+        step: 15,
+        total: 1000
+      }
+    }
+
     const successAlert = document.getElementById("success-alert");
     const dangerAlert = document.getElementById("danger-alert");
-    const form = jQuery("#add-stonk");
-    const table = document.getElementById("table-body")
+    const form =  document.getElementById("add-stonk");
+    const table = document.getElementById("table-body");
 
-    const hide = (el) => el.style.display = "none";
-    const show = (el) => el.style.display = "";
+    const hide = (el) => {
+      setTimeout(() => (el.style.display = "none"), 150);
+      el.style.opacity = "0";
+    }
+    const show = (el) => {
+      el.style.display = "";
+      el.style.opacity = "1";
+    }
+
+    const locale = 'ru-RU';
+    const constFormatter = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: 'RUB',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const timeFormatter = new Intl.DateTimeFormat(locale, {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric'
+    });
+
+    const fmtPrice = (priceAsCents) => constFormatter.format(priceAsCents / 100.0);
+    const fmtTime = (timeAsStr) => timeFormatter.format(new Date(timeAsStr));
 
     const showError = (error) => {
       console.error(error);
       show(dangerAlert);
     }
 
-    jQuery("#danger-alert-dismiss").on("click", () => {
-      hide(dangerAlert)
-    });
-    jQuery("#success-alert-dismiss").on("click", () => {
-      hide(successAlert);
+    state.chart = new Chart("category-distribution", {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Распределение покупок по категориям',
+          data: [],
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.2)',
+            'rgba(54, 162, 235, 0.2)',
+            'rgba(255, 206, 86, 0.2)',
+            'rgba(75, 192, 192, 0.2)',
+            'rgba(153, 102, 255, 0.2)',
+            'rgba(181,181,181,0.2)'
+          ],
+          borderColor: [
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)',
+            'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(153, 102, 255, 1)',
+            'rgb(133,133,133)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: {
+          yAxes: [{
+            ticks: {
+              beginAtZero: true
+            }
+          }]
+        },
+        tooltips: {
+          callbacks: {
+            label: (tooltipItem, data) => fmtPrice(tooltipItem.yLabel * 100)
+          }
+        }
+      }
     });
 
+    const maxCategories = 5;
+    const recalcChartData = () => {
+      const categories = state.rows
+        .reduce((acc, next) => ({...acc, [next.category?.name || ""]: (acc[next.category?.name || ""] || 0) + next.cost}), {});
+      const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+
+      const labels = [];
+      const data = sortedCats.reduce((acc, next, idx) => {
+        if (idx < 5) {
+          labels.push(next[0] || "Нет категории");
+          return [...acc, next[1]];
+        }
+        return [...acc.slice(0, maxCategories), acc[maxCategories - 1] + next[1]];
+      }, []);
+      labels.push("Остальные");
+      const formattedData = data.map(cost => cost / 100.0);
+
+      state.chart.data.labels = labels
+      state.chart.data.datasets[0].data = formattedData;
+      state.chart.update();
+    }
+
+    const createTrashCol = (id) => {
+      const td = document.createElement("td");
+      td.classList.add("d-flex", "align-items-center")
+      const button = document.createElement("button");
+      button.classList.add("btn", "btn-outline-primary");
+      button.type = "button";
+      button.addEventListener("mousedown", startRowDeletion(id));
+      const rowDeletion = cancelRowDeletion(id);
+      button.addEventListener("mouseup", rowDeletion)
+      button.addEventListener("mouseleave", rowDeletion)
+      button.innerHTML = `
+        <svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-trash-fill" fill="currentColor" xmlns="http://www.w3.org/2000/svg" id="delete-svg-${id}">
+          <path fill-rule="evenodd" d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5a.5.5 0 0 0-1 0v7a.5.5 0 0 0 1 0v-7z"></path>
+        </svg>
+      `;
+      td.append(button);
+
+      const progress = document.createElement("div");
+      progress.classList.add("progress", "ml-3");
+      progress.id = `progress-${id}`;
+      progress.style.width = "50px";
+      progress.style.opacity = "0";
+      progress.innerHTML = `<div class="progress-bar" role="progressbar" id="progress-bar-${id}"></div>`
+      td.append(progress);
+      return td;
+    }
+
+    const createRow = ({id, name, cost, category, addedAt}) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+          <td><b>${name}</b></td>
+          <td>${fmtPrice(cost)}</td>
+          <td>${category?.name || ''}</td>
+          <td>${fmtTime(addedAt)}</td>
+        `
+      row.append(createTrashCol(id))
+      return row;
+    }
+    const appendRow = (rowData) => table.append(createRow(rowData));
+    const prependRow = (rowData) => table.prepend(createRow(rowData));
+    const clearRows = () => table.innerHTML = "";
+
+    const getAllRows = () => axios.get("/api/stonk/all").then(response => {
+      state.rows = response.data;
+      clearRows();
+      response.data.slice(0, 6).forEach(dataRow => appendRow(dataRow));
+      recalcChartData();
+    })
+    getAllRows();
+
+    const startRowDeletion = (id) => {
+      return () => {
+        const progress = document.getElementById(`progress-${id}`);
+        progress.style.opacity = "1";4
+
+        const progressBar = document.getElementById(`progress-bar-${id}`);
+        progressBar.style.width = "0%";
+
+        state.deletion.interval = setInterval(() => {
+          state.deletion.ticks += state.deletion.step;
+          progressBar.style.width = (state.deletion.ticks / state.deletion.total * 100).toFixed(1) + "%";
+        }, state.deletion.step)
+
+        state.deletion.timeout = setTimeout(() => {
+          axios.delete(`/api/stonk/${id}`).then(getAllRows).catch(showError);
+          cancelRowDeletion(id)();
+        }, state.deletion.total);
+      }
+    }
+
+    const cancelRowDeletion = (id) => {
+      return () => {
+        const progress = document.getElementById(`progress-${id}`);
+        progress.style.opacity = "0";
+        clearTimeout(state.deletion.timeout);
+        clearInterval(state.deletion.interval);
+        state.deletion.ticks = 0;
+      }
+    }
+
+    //on add stonk click
     document.getElementById("add-stonk").addEventListener("submit", (event) => {
       event.preventDefault();
 
-      const newStonk = form.serializeArray().reduce((acc, next) => ({...acc, [next.name]: next.value}), {});
+      const newStonk = Object.fromEntries(new FormData(form));
       newStonk.cost = newStonk.cost * 100;
+      newStonk.category = { name: newStonk.category };
 
-      axios.post("/api/stonk/add", newStonk)
-        .then((response) => {
+      axios.post("/api/stonk/", newStonk)
+        .then(response => {
+          form.reset();
           axios.get(`/api/stonk/${response.data.id}`)
             .then((response) => {
-              const {id, name, cost, category, addedAt} = response.data;
-              const row = document.createElement("tr");
-              row.innerHTML = `
-                <td>${id}</td>
-                <td><b>${name}</b></td>
-                <td>${cost}</td>
-                <td>${category}</td>
-                <td>${addedAt}</td>
-              `
-              table.prepend(row);
+              prependRow(response.data);
+              state.rows = [response.data, ...state.rows]
               show(successAlert);
               setTimeout(() => hide(successAlert), 5000)
+              recalcChartData();
             })
-            .catch((error) => showError(error));
+            .catch(showError);
         })
-        .catch((error) => showError(error));
+        .catch(showError);
     });
   });
 </script>

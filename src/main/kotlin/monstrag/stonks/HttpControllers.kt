@@ -1,5 +1,6 @@
 package monstrag.stonks
 
+import monstrag.stonks.model.Stonk
 import org.springframework.http.HttpStatus.*
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
@@ -9,12 +10,18 @@ import org.springframework.web.server.ResponseStatusException
 class StonkController(private val repository: StonkRepository) {
 
 	@GetMapping("/")
+	fun findTop5() = repository.findTop5ByOrderByAddedAtDesc()
+
+	@GetMapping("/all")
 	fun findAll() = repository.findAllByOrderByAddedAtDesc()
 
 	@GetMapping("/{id}")
-	fun findOne(@PathVariable id: Long) =
-			repository.findById(id).unwrap()?.render() ?: throw ResponseStatusException(NOT_FOUND, "This stonk doesn't exist")
+	fun findById(@PathVariable id: Long) =
+			repository.findById(id).unwrap() ?: throw ResponseStatusException(NOT_FOUND, "This stonk doesn't exist")
 
-	@PostMapping("/add")
+	@DeleteMapping("/{id}")
+	fun deleteById(@PathVariable id: Long) = repository.deleteById(id)
+
+	@PostMapping("/")
 	fun add(@RequestBody stonk: Stonk) = repository.save(stonk)
 }

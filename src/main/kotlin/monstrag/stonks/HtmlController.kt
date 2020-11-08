@@ -6,12 +6,11 @@ import org.springframework.ui.set
 import org.springframework.web.bind.annotation.GetMapping
 
 @Controller
-class HtmlController(private val repository: StonkRepository) {
+class HtmlController {
 
 	@GetMapping("/")
 	fun dashboard(model: Model): String {
 		model["title"] = "Покупки"
-		model["stonks"] = repository.findAllByOrderByAddedAtDesc().map { it.render() }
 		return "dashboard"
 	}
 }
