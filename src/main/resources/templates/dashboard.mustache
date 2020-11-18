@@ -2,8 +2,7 @@
 
 <div class="container-fluid">
   <div class="row">
-    <div class="col-1 d-md-none d-lg-block"></div>
-    <div class="col-9">
+    <div class="col-md-12 col-lg-10 col-xl-9 offset-lg-1">
       <h2 class="mt-5">{{title}}</h2>
 
       <div class="row">
@@ -31,7 +30,8 @@
             <div class="form-group">
               <label for="cost">Цена</label>
               <div class="input-group">
-                <input id="cost" name="cost" type="number" class="form-control" min="0.00" max="200000.00" step="0.01" required>
+                <input id="cost" name="cost" type="number" class="form-control" min="0.00" max="200000.00" step="0.01"
+                       required>
                 <div class="input-group-append">
                   <span class="input-group-text" id="input-group-append">₽</span>
                 </div>
@@ -44,11 +44,11 @@
             <button type="submit" class="btn btn-primary">Добавить</button>
           </form>
 
-          <div class="alert alert-success fade show mt-3" style="display: none" id="success-alert">
+          <div class="alert alert-success fade show absolute-alert mt-3" style="display: none" id="success-alert">
             Добавлено!
           </div>
 
-          <div class="alert alert-danger fade show mt-3" style="display: none" id="danger-alert">
+          <div class="alert alert-danger fade show absolute-alert mt-3" style="display: none" id="danger-alert">
             Ошибка!
           </div>
         </div>
@@ -61,53 +61,45 @@
       </div>
 
     </div>
-    <div class="col-2 d-md-none d-lg-block"></div>
   </div>
 </div>
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     const state = {
-      rows: [],
-      chart: null,
+      rows: [], chart: null,
 
       deletion: {
-        timeout: null,
-        interval: null,
-        ticks: 0,
-        step: 15,
-        total: 1000
+        timeout: null, interval: null, ticks: 0, step: 15, total: 1000
       }
     }
 
     const successAlert = document.getElementById("success-alert");
     const dangerAlert = document.getElementById("danger-alert");
-    const form =  document.getElementById("add-stonk");
+    const form = document.getElementById("add-stonk");
     const table = document.getElementById("table-body");
 
-    const hide = (el) => {
-      setTimeout(() => (el.style.display = "none"), 150);
-      el.style.opacity = "0";
+    const hide = (el) => el.style.display = "none";
+    const show = (el) => el.style.display = "";
+
+    const opaque = (el) => el.style.opacity = "1";
+    const transparent = (el) => el.style.opacity = "0";
+
+    const hideSlow = (el) => {
+      setTimeout(() => hide(el), 150);
+      transparent(el);
     }
-    const show = (el) => {
-      el.style.display = "";
-      el.style.opacity = "1";
+    const showSlow = (el) => {
+      show(el);
+      opaque(el);
     }
 
     const locale = 'ru-RU';
     const constFormatter = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: 'RUB',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      style: 'currency', currency: 'RUB', minimumFractionDigits: 2, maximumFractionDigits: 2,
     });
     const timeFormatter = new Intl.DateTimeFormat(locale, {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric'
+      weekday: 'short', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric'
     });
 
     const fmtPrice = (priceAsCents) => constFormatter.format(priceAsCents / 100.0);
@@ -115,44 +107,26 @@
 
     const showError = (error) => {
       console.error(error);
-      show(dangerAlert);
+      showSlow(dangerAlert);
     }
 
     state.chart = new Chart("category-distribution", {
-      type: 'bar',
-      data: {
-        labels: [],
-        datasets: [{
+      type: 'bar', data: {
+        labels: [], datasets: [{
           label: 'Распределение покупок по категориям',
           data: [],
-          backgroundColor: [
-            'rgba(255, 99, 132, 0.2)',
-            'rgba(54, 162, 235, 0.2)',
-            'rgba(255, 206, 86, 0.2)',
-            'rgba(75, 192, 192, 0.2)',
-            'rgba(153, 102, 255, 0.2)',
-            'rgba(181,181,181,0.2)'
-          ],
-          borderColor: [
-            'rgba(255, 99, 132, 1)',
-            'rgba(54, 162, 235, 1)',
-            'rgba(255, 206, 86, 1)',
-            'rgba(75, 192, 192, 1)',
-            'rgba(153, 102, 255, 1)',
-            'rgb(133,133,133)'
-          ],
+          backgroundColor: ['rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(255, 206, 86, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(181,181,181,0.2)'],
+          borderColor: ['rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 206, 86, 1)', 'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgb(133,133,133)'],
           borderWidth: 1
         }]
-      },
-      options: {
+      }, options: {
         scales: {
           yAxes: [{
             ticks: {
               beginAtZero: true
             }
           }]
-        },
-        tooltips: {
+        }, tooltips: {
           callbacks: {
             label: (tooltipItem, data) => fmtPrice(tooltipItem.yLabel * 100)
           }
@@ -160,14 +134,13 @@
       }
     });
 
+    const getCategoryName = (row) => row.category?.name || "";
     const maxCategories = 5;
     const recalcChartData = () => {
       const categories = state.rows
-        .reduce((acc, next) => ({...acc, [next.category?.name || ""]: (acc[next.category?.name || ""] || 0) + next.cost}), {});
-      const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
-
+        .reduce((acc, row) => ({...acc, [getCategoryName(row)]: (acc[getCategoryName(row)] || 0) + row.cost}), {});
       const labels = [];
-      const data = sortedCats.reduce((acc, next, idx) => {
+      const data = Object.entries(categories).sort((a, b) => b[1] - a[1]).reduce((acc, next, idx) => {
         if (idx < 5) {
           labels.push(next[0] || "Нет категории");
           return [...acc, next[1]];
@@ -175,10 +148,9 @@
         return [...acc.slice(0, maxCategories), acc[maxCategories - 1] + next[1]];
       }, []);
       labels.push("Остальные");
-      const formattedData = data.map(cost => cost / 100.0);
 
       state.chart.data.labels = labels
-      state.chart.data.datasets[0].data = formattedData;
+      state.chart.data.datasets[0].data = data.map(cost => cost / 100.0);
       state.chart.update();
     }
 
@@ -186,14 +158,13 @@
       const td = document.createElement("td");
       td.classList.add("d-flex", "align-items-center")
       const button = document.createElement("button");
-      button.classList.add("btn", "btn-outline-primary");
+      button.classList.add("btn", "btn-outline-primary", "p-1");
       button.type = "button";
-      button.addEventListener("mousedown", startRowDeletion(id));
-      const rowDeletion = cancelRowDeletion(id);
-      button.addEventListener("mouseup", rowDeletion)
-      button.addEventListener("mouseleave", rowDeletion)
+      button.addEventListener("mousedown", () => startRowDeletion(id));
+      button.addEventListener("mouseup", cancelRowDeletion(id))
+      button.addEventListener("mouseleave", cancelRowDeletion(id))
       button.innerHTML = `
-        <svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-trash-fill" fill="currentColor" xmlns="http://www.w3.org/2000/svg" id="delete-svg-${id}">
+        <svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-trash-fill" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
           <path fill-rule="evenodd" d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5a.5.5 0 0 0-1 0v7a.5.5 0 0 0 1 0v-7z"></path>
         </svg>
       `;
@@ -233,29 +204,25 @@
     getAllRows();
 
     const startRowDeletion = (id) => {
-      return () => {
-        const progress = document.getElementById(`progress-${id}`);
-        progress.style.opacity = "1";4
+      opaque(document.getElementById(`progress-${id}`));
 
-        const progressBar = document.getElementById(`progress-bar-${id}`);
-        progressBar.style.width = "0%";
+      const progressBar = document.getElementById(`progress-bar-${id}`);
+      progressBar.style.width = "0%";
 
-        state.deletion.interval = setInterval(() => {
-          state.deletion.ticks += state.deletion.step;
-          progressBar.style.width = (state.deletion.ticks / state.deletion.total * 100).toFixed(1) + "%";
-        }, state.deletion.step)
+      state.deletion.interval = setInterval(() => {
+        state.deletion.ticks += state.deletion.step;
+        progressBar.style.width = (state.deletion.ticks / state.deletion.total * 100).toFixed(1) + "%";
+      }, state.deletion.step)
 
-        state.deletion.timeout = setTimeout(() => {
-          axios.delete(`/api/stonk/${id}`).then(getAllRows).catch(showError);
-          cancelRowDeletion(id)();
-        }, state.deletion.total);
-      }
+      state.deletion.timeout = setTimeout(() => {
+        axios.delete(`/api/stonk/${id}`).then(getAllRows).catch(showError);
+        cancelRowDeletion(id)();
+      }, state.deletion.total);
     }
 
     const cancelRowDeletion = (id) => {
       return () => {
-        const progress = document.getElementById(`progress-${id}`);
-        progress.style.opacity = "0";
+        transparent(document.getElementById(`progress-${id}`))
         clearTimeout(state.deletion.timeout);
         clearInterval(state.deletion.interval);
         state.deletion.ticks = 0;
@@ -263,27 +230,23 @@
     }
 
     //on add stonk click
-    document.getElementById("add-stonk").addEventListener("submit", (event) => {
+    form.addEventListener("submit", (event) => {
       event.preventDefault();
 
       const newStonk = Object.fromEntries(new FormData(form));
       newStonk.cost = newStonk.cost * 100;
-      newStonk.category = { name: newStonk.category };
+      newStonk.category = {name: newStonk.category};
 
-      axios.post("/api/stonk/", newStonk)
-        .then(response => {
-          form.reset();
-          axios.get(`/api/stonk/${response.data.id}`)
-            .then((response) => {
-              prependRow(response.data);
-              state.rows = [response.data, ...state.rows]
-              show(successAlert);
-              setTimeout(() => hide(successAlert), 5000)
-              recalcChartData();
-            })
-            .catch(showError);
-        })
-        .catch(showError);
+      axios.post("/api/stonk/", newStonk).then(response => {
+        form.reset();
+        axios.get(`/api/stonk/${response.data.id}`).then(response => {
+          prependRow(response.data);
+          state.rows = [response.data, ...state.rows]
+          showSlow(successAlert);
+          setTimeout(() => hideSlow(successAlert), 5000)
+          recalcChartData();
+        }).catch(showError);
+      }).catch(showError);
     });
   });
 </script>
